@@ -4,45 +4,7 @@ pragma(lib, "ProxyGetterLibrary");
 
 import std.stdio;
 import std.string;
-
-//private struct ProxyAndPortC {
-//	
-//	const char* proxy;
-//	int port;
-//
-//};
-//
-//private struct ProxyAndPort {
-//
-//	string proxy;
-//	int port;
-//
-//};
-//
-//private extern (C) ProxyAndPortC getHttpProxyAndPort(const char* proxyType, const char* portType);
-//
-//
-///// Using the Cocoa API, get a given proxy server and corresponding port.
-//private ProxyAndPort getHttpProxyAndPort(string proxyType, string portType) {
-//
-//	auto proxyAndPortC = getHttpProxyAndPort(proxyType.toStringz, portType.toStringz);
-//	string proxy = fromStringz(proxyAndPortC.proxy).idup;
-//
-//	return ProxyAndPort(proxy, proxyAndPortC.port);
-//
-//}
-//
-//ProxyAndPort getHttpProxyAndPort(ProxyType proxyType) {
-//
-//	import std.conv;
-//	import std.uni;
-//
-//	auto proxyName = proxyType.to!string.toUpper ~ "Proxy";
-//	auto portName = proxyType.to!string.toUpper ~ "Port";
-//
-//	return getHttpProxyAndPort(proxyName, portName);
-//
-//}
+import std.traits;
 
 enum ProxyType {
 	
@@ -57,7 +19,8 @@ enum ProxyType {
 private extern (Objective-C)
 	interface ClassObjC
 {
-	NSStringObjC alloc() @selector("alloc");
+	NSStringObjC allocNSString() @selector("alloc");
+	NSNumberObjC allocNSNumber() @selector("alloc");
 }
 
 private extern (Objective-C)
@@ -69,14 +32,29 @@ private extern (Objective-C)
 }
 
 private extern (Objective-C)
+	interface NSNumberObjC
+{
+	NSNumberObjC initWithInt(in int number) @selector("initWithInt:");
+	int intValue() @selector("intValue");
+	void release() @selector("release");
+}
+
+private extern (Objective-C)
 	interface NSDictionaryObjC
 {
-	NSStringObjC objectForKey(NSStringObjC) @selector("objectForKey:");
+	NSStringObjC nsStringForKey(NSStringObjC key) @selector("objectForKey:");
+	NSNumberObjC nsNumberForKey(NSStringObjC key) @selector("objectForKey:");
+	void release() @selector("release");
+}
+
+private extern (Objective-C)
+	interface NSArrayObjC
+{
+
 	void release() @selector("release");
 }
 
 private extern (C) ClassObjC objc_lookUpClass(in char* name);
-
 private extern (C) NSDictionaryObjC getProxyTable();
 
 /// Wrapper to NSString.
@@ -95,7 +73,7 @@ public:
 	this(string input) {
 
 		auto classLookup = objc_lookUpClass("NSString");
-		this.nsStringObjC = classLookup.alloc().initWithUTF8String(input.toStringz);
+		this.nsStringObjC = classLookup.allocNSString().initWithUTF8String(input.toStringz);
 
 	}
 
@@ -107,6 +85,33 @@ public:
 
 }
 
+/// Wrapper to NSNumber.
+private struct NSNumber {
+	
+private:
+
+	NSNumberObjC nsNumberObjC;
+	@property NSNumberObjC objectiveCObject() { return nsNumberObjC; }
+	
+public:
+
+	@property int toInt() { return nsNumberObjC.intValue; }
+	
+	this(int input) {
+		
+		auto classLookup = objc_lookUpClass("NSNumber");
+		this.nsNumberObjC = classLookup.allocNSNumber().initWithInt(input);
+		
+	}
+	
+	~this() {
+		
+		this.nsNumberObjC.release();
+		
+	}
+	
+}
+
 /// Wrapper to NSDictionary.
 private class NSDictionary {
 	
@@ -116,17 +121,32 @@ private:
 
 public:
 
-	string opIndex(string key) {
+	T getValue(T)(string key)
+		if(is(T==int) || is(T==string))
+	{
 
 		auto nsKey = NSString(key);
 
-		// NB: The following as an NSString that is "owned" by the dictionary,
-		// so don't try to release it.
-		auto valueObjC = nsDictionaryObjC.objectForKey(nsKey.objectiveCObject);
+		// Now, simply extract the value and convert to a D type.
+		static if(is(T==int)) {
 
-		// Now, simply extract the C string and convert to a D string.
-		auto valueC = valueObjC.UTF8String;
-		auto value = fromStringz(valueC).idup;
+			// NB: The following as an NSNumber that is "owned" by the dictionary,
+			// so don't try to release it.
+			auto valueObjC = nsDictionaryObjC.nsNumberForKey(nsKey.objectiveCObject);
+			auto value = valueObjC.intValue;
+
+		} else static if(is(T==string)) {
+
+			// NB: The following as an NSString that is "owned" by the dictionary,
+			// so don't try to release it.
+			auto valueObjC = nsDictionaryObjC.nsStringForKey(nsKey.objectiveCObject);auto valueC = valueObjC.UTF8String;
+			auto value = fromStringz(valueC).idup;
+
+		} else {
+
+			assert(false, "The type should be int or string.");
+
+		}
 
 		return value;
 
@@ -148,17 +168,12 @@ public:
 
 void main(string[] args)
 {
+
 	import std.typecons;
 
-
-//	ProxyAndPort proxyAndPort = getHttpProxyAndPort(ProxyType.https);
-//
-//	writefln("proxy: %s; port: %s", proxyAndPort.proxy, proxyAndPort.port);
-
 	auto nsProxies = new NSDictionary(getProxyTable());
-	auto proxyType = NSString("HTTPProxy");
 
-	writeln(nsProxies["HTTPPort"]);
+	writeln(nsProxies.getValue!string("HTTPProxy"), nsProxies.getValue!int("HTTPPort"), nsProxies.getValue!int("HTTP"));
 
 }
 
