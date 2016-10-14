@@ -5,6 +5,7 @@ pragma(lib, "ProxyGetterLibrary");
 import std.stdio;
 import std.string;
 import std.traits;
+import std.range;
 
 enum ProxyType {
 	
@@ -51,7 +52,7 @@ private extern (Objective-C)
 private extern (Objective-C)
 	interface NSArrayObjC
 {
-	NSStringObjC stringAtIndex(NSNumberObjC index) @selector("objectAtIndex:");
+	NSStringObjC stringAtIndex(uint index) @selector("objectAtIndex:");
 	uint count() @selector("count");
 	void release() @selector("release");
 }
@@ -197,14 +198,30 @@ public:
 	
 }
 
-/// Wrapper to NSArray.
+/// Simplified wrapper to NSArray.
 private class NSArray {
 
 private:
 	NSArrayObjC nsArrayObjC;
 	@property NSArrayObjC objectiveCObject() { return nsArrayObjC; }
+	uint currentIndex = 0;
 
 public:
+
+	// The following makes NSArray a forward range.
+	@property bool empty() { return count - currentIndex <= 0; }
+	@property string front() { return this[currentIndex]; }
+	@property void popFront() { ++currentIndex; }
+
+	string opIndex(int index) {
+
+		NSStringObjC nsStringObjC = nsArrayObjC.stringAtIndex(currentIndex);
+		auto cString = nsStringObjC.UTF8String;
+		auto value = fromStringz(cString).idup;
+
+		return value;
+
+	}
 
 	/// If you intend for the object to take care of memory
 	/// management, set this property to `true` (the default).
@@ -237,10 +254,14 @@ void main(string[] args)
 	auto nsProxies = new NSDictionary(getProxyTable());
 
 
-	auto allKeys = nsProxies.allKeys;
+	foreach(key; nsProxies.allKeys) {
 
-	writeln(nsProxies.getValue!string("HTTPProxy"), nsProxies.getValue!int("HTTPPort"), nsProxies.getValue!int("HTTP"));
-	writeln(allKeys.count);
+		writeln(key);
+
+	}
+
+
+	writeln(nsProxies.getValue!string("HTTPProxy"), nsProxies.getValue!int("HTTPPort"), nsProxies.getValue!int("HTTPEnable"));
 
 }
 
