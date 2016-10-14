@@ -20,7 +20,7 @@ private extern (Objective-C)
 	interface ClassObjC
 {
 	NSStringObjC allocNSString() @selector("alloc");
-	NSNumberObjC allocNSNumber() @selector("alloc");
+	NSUIntegerObjC allocNSUInteger() @selector("alloc");
 }
 
 private extern (Objective-C)
@@ -32,9 +32,9 @@ private extern (Objective-C)
 }
 
 private extern (Objective-C)
-	interface NSNumberObjC
+	interface NSUIntegerObjC
 {
-	NSNumberObjC initWithInt(in int number) @selector("initWithInt:");
+	NSUIntegerObjC initWithInt(in int number) @selector("initWithInt:");
 	int intValue() @selector("intValue");
 	void release() @selector("release");
 }
@@ -43,14 +43,13 @@ private extern (Objective-C)
 	interface NSDictionaryObjC
 {
 	NSStringObjC nsStringForKey(NSStringObjC key) @selector("objectForKey:");
-	NSNumberObjC nsNumberForKey(NSStringObjC key) @selector("objectForKey:");
+	NSUIntegerObjC nsNumberForKey(NSStringObjC key) @selector("objectForKey:");
 	void release() @selector("release");
 }
 
 private extern (Objective-C)
 	interface NSArrayObjC
 {
-
 	void release() @selector("release");
 }
 
@@ -85,22 +84,23 @@ public:
 
 }
 
-/// Wrapper to NSNumber.
-private struct NSNumber {
+/// Wrapper to NSUInteger.
+private struct NSUInteger {
 	
 private:
 
-	NSNumberObjC nsNumberObjC;
-	@property NSNumberObjC objectiveCObject() { return nsNumberObjC; }
+	NSUIntegerObjC nsNumberObjC;
+	@property NSUIntegerObjC objectiveCObject() { return nsNumberObjC; }
 	
 public:
 
 	@property int toInt() { return nsNumberObjC.intValue; }
-	
-	this(int input) {
+	@property uint toUInt() { return nsNumberObjC.intValue; }
+
+	this(uint input) {
 		
-		auto classLookup = objc_lookUpClass("NSNumber");
-		this.nsNumberObjC = classLookup.allocNSNumber().initWithInt(input);
+		auto classLookup = objc_lookUpClass("NSUInteger");
+		this.nsNumberObjC = classLookup.allocNSUInteger().initWithInt(input);
 		
 	}
 	
@@ -130,7 +130,7 @@ public:
 		// Now, simply extract the value and convert to a D type.
 		static if(is(T==int)) {
 
-			// NB: The following as an NSNumber that is "owned" by the dictionary,
+			// NB: The following as an NSUInteger that is "owned" by the dictionary,
 			// so don't try to release it.
 			auto valueObjC = nsDictionaryObjC.nsNumberForKey(nsKey.objectiveCObject);
 			auto value = valueObjC.intValue;
