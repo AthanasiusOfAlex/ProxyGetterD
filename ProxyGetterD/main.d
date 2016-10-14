@@ -20,7 +20,7 @@ private extern (Objective-C)
 	interface ClassObjC
 {
 	NSStringObjC allocNSString() @selector("alloc");
-	NSUIntegerObjC allocNSUInteger() @selector("alloc");
+	NSNumberObjC allocNSNumber() @selector("alloc");
 }
 
 private extern (Objective-C)
@@ -32,9 +32,9 @@ private extern (Objective-C)
 }
 
 private extern (Objective-C)
-	interface NSUIntegerObjC
+	interface NSNumberObjC
 {
-	NSUIntegerObjC initWithInt(in int number) @selector("initWithInt:");
+	NSNumberObjC initWithInt(in int number) @selector("initWithInt:");
 	int intValue() @selector("intValue");
 	void release() @selector("release");
 }
@@ -43,13 +43,16 @@ private extern (Objective-C)
 	interface NSDictionaryObjC
 {
 	NSStringObjC nsStringForKey(NSStringObjC key) @selector("objectForKey:");
-	NSUIntegerObjC nsNumberForKey(NSStringObjC key) @selector("objectForKey:");
+	NSNumberObjC nsNumberForKey(NSStringObjC key) @selector("objectForKey:");
+	NSArrayObjC allKeys() @selector("allKeys");
 	void release() @selector("release");
 }
 
 private extern (Objective-C)
 	interface NSArrayObjC
 {
+	NSStringObjC stringAtIndex(NSNumberObjC index) @selector("objectAtIndex:");
+	uint count() @selector("count");
 	void release() @selector("release");
 }
 
@@ -65,12 +68,19 @@ private:
 
 public:
 
+	/// If you intend for the object to take care of memory
+	/// management, set this property to `true`.
+	/// If the object is owned by another object, be sure to
+	/// set this property to `false`; otherwise, the program
+	/// will crash.
+	bool isOwner = true;
+
 	@property immutable(char)* toStringz() { return nsStringObjC.UTF8String; }
 	@property string toString() { return fromStringz(toStringz).idup; }
 
 
 	this(string input) {
-
+	
 		auto classLookup = objc_lookUpClass("NSString");
 		this.nsStringObjC = classLookup.allocNSString().initWithUTF8String(input.toStringz);
 
@@ -78,35 +88,48 @@ public:
 
 	~this() {
 
-		this.nsStringObjC.release();
+		if(isOwner) { this.nsStringObjC.release(); }
 
 	}
 
 }
 
-/// Wrapper to NSUInteger.
-private struct NSUInteger {
+/// Wrapper to NSNumber.
+private struct NSNumber {
 	
 private:
 
-	NSUIntegerObjC nsNumberObjC;
-	@property NSUIntegerObjC objectiveCObject() { return nsNumberObjC; }
+	NSNumberObjC nsNumberObjC;
+	@property NSNumberObjC objectiveCObject() { return nsNumberObjC; }
 	
 public:
+
+	/// If you intend for the object to take care of memory
+	/// management, set this property to `true` (the default).
+	/// If the object is owned by another object, be sure to
+	/// set this property to `false`; otherwise, the program
+	/// will crash.
+	bool isOwner = true;
 
 	@property int toInt() { return nsNumberObjC.intValue; }
 	@property uint toUInt() { return nsNumberObjC.intValue; }
 
 	this(uint input) {
 		
-		auto classLookup = objc_lookUpClass("NSUInteger");
-		this.nsNumberObjC = classLookup.allocNSUInteger().initWithInt(input);
+		auto classLookup = objc_lookUpClass("NSNumber");
+		this.nsNumberObjC = classLookup.allocNSNumber().initWithInt(input);
 		
+	}
+
+	this(NSNumberObjC objectiveCObject) {
+
+		this.nsNumberObjC = objectiveCObject;
+
 	}
 	
 	~this() {
 		
-		this.nsNumberObjC.release();
+		if(isOwner) { this.nsNumberObjC.release(); }
 		
 	}
 	
@@ -118,8 +141,16 @@ private class NSDictionary {
 private:
 	NSDictionaryObjC nsDictionaryObjC;
 	@property NSDictionaryObjC objectiveCObject() { return nsDictionaryObjC; }
+	@property NSArray allKeys() { return new NSArray(nsDictionaryObjC.allKeys); }
 
 public:
+
+	/// If you intend for the object to take care of memory
+	/// management, set this property to `true` (the default).
+	/// If the object is owned by another object, be sure to
+	/// set this property to `false`; otherwise, the program
+	/// will crash.
+	bool isOwner = true;
 
 	T getValue(T)(string key)
 		if(is(T==int) || is(T==string))
@@ -130,7 +161,7 @@ public:
 		// Now, simply extract the value and convert to a D type.
 		static if(is(T==int)) {
 
-			// NB: The following as an NSUInteger that is "owned" by the dictionary,
+			// NB: The following as an NSNumber that is "owned" by the dictionary,
 			// so don't try to release it.
 			auto valueObjC = nsDictionaryObjC.nsNumberForKey(nsKey.objectiveCObject);
 			auto value = valueObjC.intValue;
@@ -160,10 +191,42 @@ public:
 
 	~this() {
 
-		nsDictionaryObjC.release();
+		if(isOwner) { nsDictionaryObjC.release(); }
 
 	}
 	
+}
+
+/// Wrapper to NSArray.
+private class NSArray {
+
+private:
+	NSArrayObjC nsArrayObjC;
+	@property NSArrayObjC objectiveCObject() { return nsArrayObjC; }
+
+public:
+
+	/// If you intend for the object to take care of memory
+	/// management, set this property to `true` (the default).
+	/// If the object is owned by another object, be sure to
+	/// set this property to `false`; otherwise, the program
+	/// will crash.
+	bool isOwner = true;
+
+	@property int count() { return nsArrayObjC.count; }
+
+	this(NSArrayObjC objectiveCObject) {
+
+		nsArrayObjC = objectiveCObject;
+
+	}
+
+	~this() {
+
+		if(isOwner) { nsArrayObjC.release(); }
+
+	}
+
 }
 
 void main(string[] args)
@@ -173,7 +236,11 @@ void main(string[] args)
 
 	auto nsProxies = new NSDictionary(getProxyTable());
 
+
+	auto allKeys = nsProxies.allKeys;
+
 	writeln(nsProxies.getValue!string("HTTPProxy"), nsProxies.getValue!int("HTTPPort"), nsProxies.getValue!int("HTTP"));
+	writeln(allKeys.count);
 
 }
 
