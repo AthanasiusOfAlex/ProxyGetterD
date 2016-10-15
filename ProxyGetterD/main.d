@@ -1,7 +1,6 @@
 ﻿module main;
 
-pragma(lib, "ProxyGetterLibrary");
-
+import std.conv;
 import std.stdio;
 import std.string;
 import std.traits;
@@ -13,8 +12,33 @@ enum ProxyType {
 	https,
 	ftp,
 	socks,
-	no
 	
+}
+
+string proxyKey(ProxyType proxyType) {
+
+	return proxyType.to!string.toUpper ~ "Proxy";
+
+}
+
+string portKey(ProxyType proxyType) {
+	
+	return proxyType.to!string.toUpper ~ "Port";
+	
+}
+
+string enableKey(ProxyType proxyType) {
+
+	return proxyType.to!string.toUpper ~ "Enable";
+	
+}
+
+
+enum OwnerStatus {
+
+	isOwner,
+	isNotOwner
+
 }
 
 private extern (Objective-C)
@@ -60,25 +84,43 @@ private extern (Objective-C)
 private extern (C) ClassObjC objc_lookUpClass(in char* name);
 private extern (C) NSDictionaryObjC getProxyTable();
 
+extern (C) struct objc_class;
+alias Class = objc_class*;
+extern (C) struct objc_object {
+	Class isa;
+};
+alias id = objc_object*;
+
 /// Wrapper to NSString.
-private struct NSString {
+struct NSString {
 
 private:
 	NSStringObjC nsStringObjC;
 	@property NSStringObjC objectiveCObject() { return nsStringObjC; }
 
-public:
-
 	/// If you intend for the object to take care of memory
-	/// management, set this property to `true`.
+	/// management, set this property to `OwnerStatus.isOwner`.
 	/// If the object is owned by another object, be sure to
-	/// set this property to `false`; otherwise, the program
-	/// will crash.
-	bool isOwner = true;
+	/// set this property to `OwnerStatus.isNotOwner`; otherwise, the	///program will crash.
+	OwnerStatus ownerStatus = OwnerStatus.isOwner;
+
+public:
 
 	@property immutable(char)* toStringz() { return nsStringObjC.UTF8String; }
 	@property string toString() { return fromStringz(toStringz).idup; }
 
+	/// Since this initializer just accepts an
+	/// Objective-C pointer, we provide a way to
+	/// tell the object not to manage the memory.
+	/// Memory is managed by default; set the second
+	/// argument to `OwnerStatus.isNotOwner` to
+	/// turn this off.
+	private this(NSStringObjC objectiveCObject, OwnerStatus ownerStatus = OwnerStatus.isOwner) {
+
+		this.ownerStatus = ownerStatus;
+		nsStringObjC = objectiveCObject;
+
+	}
 
 	this(string input) {
 	
@@ -89,28 +131,27 @@ public:
 
 	~this() {
 
-		if(isOwner) { this.nsStringObjC.release(); }
+		if(ownerStatus == OwnerStatus.isOwner) { this.nsStringObjC.release(); }
 
 	}
 
 }
 
 /// Wrapper to NSNumber.
-private struct NSNumber {
+struct NSNumber {
 	
 private:
 
 	NSNumberObjC nsNumberObjC;
 	@property NSNumberObjC objectiveCObject() { return nsNumberObjC; }
 	
-public:
-
 	/// If you intend for the object to take care of memory
-	/// management, set this property to `true` (the default).
+	/// management, set this property to `OwnerStatus.isOwner` (the default).
 	/// If the object is owned by another object, be sure to
-	/// set this property to `false`; otherwise, the program
-	/// will crash.
-	bool isOwner = true;
+	/// set this property to `OwnerStatus.isNotOwner`; otherwise, the	///program will crash.
+	OwnerStatus ownerStatus = OwnerStatus.isOwner;
+
+public:
 
 	@property int toInt() { return nsNumberObjC.intValue; }
 	@property uint toUInt() { return nsNumberObjC.intValue; }
@@ -122,37 +163,44 @@ public:
 		
 	}
 
-	this(NSNumberObjC objectiveCObject) {
+	/// Since this initializer just accepts an
+	/// Objective-C pointer, we provide a way to
+	/// tell the object not to manage the memory.
+	/// Memory is managed by default; set the second
+	/// argument to `OwnerStatus.isNotOwner` to
+	/// turn this off.
+	private this(NSNumberObjC objectiveCObject, OwnerStatus ownerStatus = OwnerStatus.isOwner) {
 
+		this.ownerStatus = ownerStatus;
 		this.nsNumberObjC = objectiveCObject;
 
 	}
 	
 	~this() {
 		
-		if(isOwner) { this.nsNumberObjC.release(); }
+		if(ownerStatus == OwnerStatus.isOwner) { this.nsNumberObjC.release(); }
 		
 	}
 	
 }
 
 /// Wrapper to NSDictionary.
-private class NSDictionary {
+struct NSDictionary {
 	
 private:
 	NSDictionaryObjC nsDictionaryObjC;
 	@property NSDictionaryObjC objectiveCObject() { return nsDictionaryObjC; }
 	@property NSArray allKeys() { return new NSArray(nsDictionaryObjC.allKeys); }
 
-public:
-
 	/// If you intend for the object to take care of memory
-	/// management, set this property to `true` (the default).
+	/// management, set this property to `OwnerStatus.isOwner` (the default).
 	/// If the object is owned by another object, be sure to
-	/// set this property to `false`; otherwise, the program
-	/// will crash.
-	bool isOwner = true;
+	/// set this property to `OwnerStatus.isNotOwner`; otherwise, the
+	/// program will crash.
+	OwnerStatus ownerStatus = OwnerStatus.isOwner;
 
+public:
+	
 	T getValue(T)(string key)
 		if(is(T==int) || is(T==string))
 	{
@@ -162,17 +210,17 @@ public:
 		// Now, simply extract the value and convert to a D type.
 		static if(is(T==int)) {
 
-			// NB: The following as an NSNumber that is "owned" by the dictionary,
-			// so don't try to release it.
-			auto valueObjC = nsDictionaryObjC.nsNumberForKey(nsKey.objectiveCObject);
-			auto value = valueObjC.intValue;
+			// NB: The following is an NSNumber that is "owned" by the dictionary,
+			// so don't try to manage the memory.
+			auto nsValue = NSNumber(nsDictionaryObjC.nsNumberForKey(nsKey.objectiveCObject), OwnerStatus.isNotOwner);
+			auto value = nsValue.toInt;
 
 		} else static if(is(T==string)) {
 
-			// NB: The following as an NSString that is "owned" by the dictionary,
-			// so don't try to release it.
-			auto valueObjC = nsDictionaryObjC.nsStringForKey(nsKey.objectiveCObject);auto valueC = valueObjC.UTF8String;
-			auto value = fromStringz(valueC).idup;
+			// NB: The following is an NSString that is "owned" by the dictionary,
+			// so don't try to manage the memory.
+			auto nsValue = NSString(nsDictionaryObjC.nsStringForKey(nsKey.objectiveCObject), OwnerStatus.isNotOwner);
+			auto value = nsValue.toString;
 
 		} else {
 
@@ -184,27 +232,42 @@ public:
 
 	}
 
-	this(NSDictionaryObjC nsDictionaryObjC) {
-		
-		this.nsDictionaryObjC = nsDictionaryObjC;
+	/// Since this initializer just accepts an
+	/// Objective-C pointer, we provide a way to
+	/// tell the object not to manage the memory.
+	/// Memory is managed by default; set the second
+	/// argument to `OwnerStatus.isNotOwner` to
+	/// turn this off.
+	private this(NSDictionaryObjC objectiveCObject, OwnerStatus ownerStatus = OwnerStatus.isOwner) {
+
+		this.ownerStatus = ownerStatus;
+		this.nsDictionaryObjC = objectiveCObject;
 
 	}
 
 	~this() {
 
-		if(isOwner) { nsDictionaryObjC.release(); }
+		if(ownerStatus == OwnerStatus.isOwner) { nsDictionaryObjC.release(); }
 
 	}
 	
 }
 
 /// Simplified wrapper to NSArray.
-private class NSArray {
+class NSArray {
 
 private:
+
 	NSArrayObjC nsArrayObjC;
 	@property NSArrayObjC objectiveCObject() { return nsArrayObjC; }
 	uint currentIndex = 0;
+
+	/// If you intend for the object to take care of memory
+	/// management, set this property to `OwnerStatus.isOwner` (the default).
+	/// If the object is owned by another object, be sure to
+	/// set this property to `OwnerStatus.isNotOwner`; otherwise, the
+	/// program will crash.
+	OwnerStatus ownerStatus = OwnerStatus.isOwner;
 
 public:
 
@@ -215,32 +278,103 @@ public:
 
 	string opIndex(int index) {
 
-		NSStringObjC nsStringObjC = nsArrayObjC.stringAtIndex(currentIndex);
-		auto cString = nsStringObjC.UTF8String;
-		auto value = fromStringz(cString).idup;
-
-		return value;
+		NSString value = NSString(nsArrayObjC.stringAtIndex(currentIndex), OwnerStatus.isNotOwner);
+		return value.toString;
 
 	}
 
-	/// If you intend for the object to take care of memory
-	/// management, set this property to `true` (the default).
-	/// If the object is owned by another object, be sure to
-	/// set this property to `false`; otherwise, the program
-	/// will crash.
-	bool isOwner = true;
-
 	@property int count() { return nsArrayObjC.count; }
 
-	this(NSArrayObjC objectiveCObject) {
+	/// Since this initializer just accepts an
+	/// Objective-C pointer, we provide a way to
+	/// tell the object not to manage the memory.
+	/// Memory is managed by default; set the second
+	/// argument to `OwnerStatus.isNotOwner` to
+	/// turn this off.
+	private this(NSArrayObjC objectiveCObject, OwnerStatus ownerStatus = OwnerStatus.isOwner) {
 
+		this.ownerStatus = ownerStatus;
 		nsArrayObjC = objectiveCObject;
 
 	}
 
 	~this() {
 
-		if(isOwner) { nsArrayObjC.release(); }
+		if(ownerStatus == OwnerStatus.isOwner) { nsArrayObjC.release(); }
+
+	}
+
+}
+
+extern (C) struct __CFAllocator;
+alias CFAllocatorRef = __CFAllocator*;
+
+extern (C) struct __CFString;
+alias CFStringRef =  __CFString*;
+
+alias CFStringEncoding = uint;
+enum CFStringEncoding kCFStringEncodingUTF8 = 0x08000100;
+
+extern (C) CFStringRef CFStringCreateWithCString(CFAllocatorRef alloc, immutable(char) *cStr, CFStringEncoding encoding);
+
+alias CFTypeRef = void*;
+extern (C) void CFRelease(CFTypeRef cf);
+
+
+extern (C) struct  __SCDynamicStore;
+alias SCDynamicStoreRef = __SCDynamicStore*;
+alias SCDynamicStoreCallBack = void*;
+extern (C) struct SCDynamicStoreContext;
+
+extern (C) struct __CFDictionary;
+alias CFDictionaryRef = __CFDictionary*;
+
+extern (C) SCDynamicStoreRef SCDynamicStoreCreate(
+	CFAllocatorRef allocator,
+	CFStringRef name,
+	SCDynamicStoreCallBack callout,
+	SCDynamicStoreContext * context
+	);
+
+extern (C) CFDictionaryRef SCDynamicStoreCopyProxies (SCDynamicStoreRef store);
+
+
+
+// Wrapper for CFString and CFStringRef. It gets initialized with a string.
+struct CFString {
+
+private:
+	CFStringRef cfStringRef;
+	OwnerStatus ownerStatus = OwnerStatus.isOwner;
+
+	/// WARNING! This is totally unsafe. Use the
+	/// pointer ONLY during the lifetime of the
+	/// struct!
+	@property CFStringRef cPointer() { return cfStringRef; }
+
+	/// If you don't intend for this struct to manage
+	/// the memory (i.e, if you intend to be able to use
+	/// the pointer once you have transferred it to the
+	/// struct, and will release it afterwards youself),
+	/// set ownerStatus to `OwnerStatus.isNotOwnser`.
+	this(CFStringRef cPointer, OwnerStatus ownerStatus = OwnerStatus.isOwner) {
+
+		this.ownerStatus = ownerStatus;
+		this.cfStringRef = cPointer;
+
+	}
+
+public:
+
+	this(string input) {
+
+		cfStringRef = CFStringCreateWithCString(null, input.toStringz, kCFStringEncodingUTF8);
+
+	}
+
+	~this() {
+
+		if(ownerStatus == OwnerStatus.isOwner) { CFRelease(cfStringRef); }
 
 	}
 
@@ -251,17 +385,23 @@ void main(string[] args)
 
 	import std.typecons;
 
-	auto nsProxies = new NSDictionary(getProxyTable());
+	auto storeName = CFString("app");
+	auto store = SCDynamicStoreCreate(null, storeName.cPointer, null, null);
+	auto proxiesObjC = cast(NSDictionaryObjC)SCDynamicStoreCopyProxies(store);
+	auto proxies = NSDictionary(proxiesObjC);
 
+	foreach (member; EnumMembers!ProxyType) {
 
-	foreach(key; nsProxies.allKeys) {
-
-		writeln(key);
+		writefln(
+			"Proxy type: %s; proxy server: %s; port: %s; enabled: %s",
+			member,
+			proxies.getValue!string(member.proxyKey),
+			proxies.getValue!int(member.portKey),
+			proxies.getValue!int(member.enableKey));
 
 	}
 
 
-	writeln(nsProxies.getValue!string("HTTPProxy"), nsProxies.getValue!int("HTTPPort"), nsProxies.getValue!int("HTTPEnable"));
 
 }
 

@@ -18,7 +18,7 @@
     <OutputName>ProxyGetterD</OutputName>
     <Target>Executable</Target>
     <DebugLevel>0</DebugLevel>
-    <ExtraLinkerArguments>-framework Foundation -L.</ExtraLinkerArguments>
+    <ExtraLinkerArguments>-framework Foundation -framework SystemConfiguration</ExtraLinkerArguments>
     <ConsolePause>false</ConsolePause>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
@@ -50,8 +50,5 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="main.d" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="libProxyGetterLibrary.a" />
   </ItemGroup>
 </Project>
