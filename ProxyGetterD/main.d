@@ -82,7 +82,6 @@ private extern (Objective-C)
 }
 
 private extern (C) ClassObjC objc_lookUpClass(in char* name);
-private extern (C) NSDictionaryObjC getProxyTable();
 
 extern (C) struct objc_class;
 alias Class = objc_class*;
@@ -380,15 +379,23 @@ public:
 
 }
 
+NSDictionary getProxyList() {
+
+
+	auto storeName = CFString("app");
+	auto store = SCDynamicStoreCreate(null, storeName.cPointer, null, null);
+	auto proxiesObjC = cast(NSDictionaryObjC)SCDynamicStoreCopyProxies(store);
+
+	return NSDictionary(proxiesObjC);
+
+}
+
 void main(string[] args)
 {
 
 	import std.typecons;
 
-	auto storeName = CFString("app");
-	auto store = SCDynamicStoreCreate(null, storeName.cPointer, null, null);
-	auto proxiesObjC = cast(NSDictionaryObjC)SCDynamicStoreCopyProxies(store);
-	auto proxies = NSDictionary(proxiesObjC);
+	NSDictionary proxies = getProxyList();
 
 	foreach (member; EnumMembers!ProxyType) {
 
@@ -400,8 +407,6 @@ void main(string[] args)
 			proxies.getValue!int(member.enableKey));
 
 	}
-
-
 
 }
 
