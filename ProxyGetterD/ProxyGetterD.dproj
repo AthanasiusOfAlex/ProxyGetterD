@@ -50,5 +50,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="main.d" />
+    <Compile Include="ProxyGetter\cocoainterface.d" />
+    <Compile Include="ProxyGetter\proxygetter.d" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="ProxyGetter\" />
   </ItemGroup>
 </Project>
