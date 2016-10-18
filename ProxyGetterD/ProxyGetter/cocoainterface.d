@@ -263,12 +263,6 @@ public:
 		this.nsDictionaryObjC = objectiveCObject;
 		
 	}
-
-	this (SCDynamicStore dynamicStore) {
-
-		nsDictionaryObjC = cast(NSDictionaryObjC)SCDynamicStoreCopyProxies(dynamicStore.cPointer);
-
-	}
 	
 	~this() {
 		
@@ -327,92 +321,6 @@ public:
 		
 		if(ownerStatus == OwnerStatus.isOwner) { nsArrayObjC.release(); }
 		
-	}
-	
-}
-
-/// Wrapper for CFString and CFStringRef.
-/// It gets initialized with a string.
-struct CFString {
-	
-private:
-	CFStringRef cfStringRef;
-	OwnerStatus ownerStatus = OwnerStatus.isOwner;
-	
-	/// Returns the original c pointer.
-	/// WARNING! This is totally unsafe. Use the
-	/// pointer ONLY during the lifetime of the
-	/// struct!
-	@property CFStringRef cPointer() { return cfStringRef; }
-	
-	/// If you don't intend for this struct to manage
-	/// the memory (i.e, if you intend to be able to use
-	/// the pointer once you have transferred it to the
-	/// struct, and will release it afterwards youself),
-	/// set ownerStatus to `OwnerStatus.isNotOwnser`.
-	this(CFStringRef cPointer, OwnerStatus ownerStatus = OwnerStatus.isOwner) {
-		
-		this.ownerStatus = ownerStatus;
-		this.cfStringRef = cPointer;
-		
-	}
-	
-public:
-	
-	this(string input) {
-		
-		cfStringRef = CFStringCreateWithCString(null, input.toStringz, kCFStringEncodingUTF8);
-		
-	}
-	
-	~this() {
-		
-		if(ownerStatus == OwnerStatus.isOwner) { CFRelease(cfStringRef); }
-		
-	}
-	
-}
-
-/// Wrapper for SCDynamicStore and SCDynamicStoreRef.
-/// It gets initialized with a string.
-struct SCDynamicStore {
-
-private:
-	SCDynamicStoreRef scDynamicStoreRef;
-	OwnerStatus ownerStatus = OwnerStatus.isNotOwner;
-	
-	/// Returns the original c pointer.
-	/// WARNING! This is totally unsafe. Use the
-	/// pointer ONLY during the lifetime of the
-	/// struct!
-	@property SCDynamicStoreRef cPointer() { return scDynamicStoreRef; }
-	
-	/// If you don't intend for this struct to manage
-	/// the memory (i.e, if you intend to be able to use
-	/// the pointer once you have transferred it to the
-	/// struct, and will release it afterwards youself),
-	/// set ownerStatus to `OwnerStatus.isNotOwnser`.
-	this(SCDynamicStoreRef cPointer, OwnerStatus ownerStatus = OwnerStatus.isOwner) {
-		
-		this.ownerStatus = ownerStatus;
-		this.scDynamicStoreRef = cPointer;
-		
-	}
-
-public:
-
-	this(string input) {
-
-		this.ownerStatus = ownerStatus;
-		auto storeName = CFString(input);
-		scDynamicStoreRef = SCDynamicStoreCreate(null, storeName.cPointer, null, null);
-		
-	}
-	
-	~this() {
-
-		if(ownerStatus == OwnerStatus.isOwner) { CFRelease(scDynamicStoreRef); }
-
 	}
 	
 }
