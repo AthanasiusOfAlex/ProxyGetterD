@@ -17,7 +17,7 @@ enum ProxyType {
 string proxyKey(ProxyType proxyType) {
 	
 	return proxyType.to!string.toUpper ~ "Proxy";
-	
+
 }
 
 string portKey(ProxyType proxyType) {
@@ -33,10 +33,7 @@ string enableKey(ProxyType proxyType) {
 }
 
 NSDictionary getProxyList() {
-	
-	auto store = SCDynamicStore("app");
-	auto dictionary = NSDictionary(store);
 
-	return dictionary;
-	
+	return getProxySettingsDictionary();
+
 }

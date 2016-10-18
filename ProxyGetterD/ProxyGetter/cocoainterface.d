@@ -2,8 +2,8 @@
 
 import std.string;
 
-private enum OwnerStatus {
-	
+enum OwnerStatus {
+
 	isOwner,
 	isNotOwner
 	
@@ -379,7 +379,7 @@ struct SCDynamicStore {
 
 private:
 	SCDynamicStoreRef scDynamicStoreRef;
-	OwnerStatus ownerStatus = OwnerStatus.isOwner;
+	OwnerStatus ownerStatus = OwnerStatus.isNotOwner;
 	
 	/// Returns the original c pointer.
 	/// WARNING! This is totally unsafe. Use the
@@ -398,20 +398,29 @@ private:
 		this.scDynamicStoreRef = cPointer;
 		
 	}
-	
+
 public:
-	
+
 	this(string input) {
 
+		this.ownerStatus = ownerStatus;
 		auto storeName = CFString(input);
 		scDynamicStoreRef = SCDynamicStoreCreate(null, storeName.cPointer, null, null);
 		
 	}
 	
 	~this() {
-		
+
 		if(ownerStatus == OwnerStatus.isOwner) { CFRelease(scDynamicStoreRef); }
-		
+
 	}
 	
+}
+
+/// Get the proxy settings
+NSDictionary getProxySettingsDictionary() {
+
+	auto objectiveCObject = cast(NSDictionaryObjC)SCDynamicStoreCopyProxies(null);
+	return NSDictionary(objectiveCObject);
+
 }
