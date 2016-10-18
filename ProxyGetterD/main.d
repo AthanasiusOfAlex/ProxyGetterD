@@ -346,6 +346,7 @@ private:
 	CFStringRef cfStringRef;
 	OwnerStatus ownerStatus = OwnerStatus.isOwner;
 
+	/// Returns the original c pointer.
 	/// WARNING! This is totally unsafe. Use the
 	/// pointer ONLY during the lifetime of the
 	/// struct!
@@ -380,7 +381,6 @@ public:
 }
 
 NSDictionary getProxyList() {
-
 
 	auto storeName = CFString("app");
 	auto store = SCDynamicStoreCreate(null, storeName.cPointer, null, null);
