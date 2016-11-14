@@ -2,38 +2,65 @@
 
 public import ProxyGetter.CocoaInterface;
 
-import std.conv: to;
 import std.string;
+import std.traits;
+import std.typecons;
 
-enum ProxyType {
-	
-	http,
-	https,
-	ftp,
-	socks,
-	
+struct ProxyEntry {
+
+	string address;
+	int port;
+	bool isEnabled;
 }
 
-string proxyKey(ProxyType proxyType) {
-	
-	return proxyType.to!string.toUpper ~ "Proxy";
+ProxyEntry[ProxyType] getProxyTable() {
+
+	ProxyEntry[ProxyType] result;
+	NSDictionary nsDictionary = getProxySettingsDictionary();
+
+	foreach (proxyType; EnumMembers!ProxyType) {
+
+		ProxyDictionaryKeys keys = getKeys(proxyType);
+
+		string address = nsDictionary.getValue!string(keys.proxy);
+		int port = nsDictionary.getValue!int(keys.port);
+		int enable = nsDictionary.getValue!int(keys.enable);
+
+		bool isEnabled;
+
+		if (enable==0) {
+
+			isEnabled = false;
+
+		} else {
+
+			isEnabled = true;
+			
+		}
+
+		result[proxyType] = ProxyEntry(address, port, isEnabled);
+
+	}
+
+	return result;
 
 }
 
-string portKey(ProxyType proxyType) {
-	
-	return proxyType.to!string.toUpper ~ "Port";
-	
-}
+Nullable!string getHttpProxy() {
 
-string enableKey(ProxyType proxyType) {
-	
-	return proxyType.to!string.toUpper ~ "Enable";
-	
-}
+	auto proxyEntry = getProxyTable()[ProxyType.http];
+	Nullable!string result;
 
-NSDictionary getProxyList() {
+	if (proxyEntry.isEnabled) {
+		
+		result = format("%s:%s", proxyEntry.address, proxyEntry.port);
 
-	return getProxySettingsDictionary();
+	} else {
+		
+		result.nullify();
+
+	}
+
+	return result;
 
 }

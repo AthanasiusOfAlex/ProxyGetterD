@@ -9,6 +9,15 @@ enum OwnerStatus {
 	
 }
 
+enum ProxyType {
+	
+	http,
+	https,
+	ftp,
+	socks,
+	
+} 
+
 /*********************************************
  * Declarations of Objective C interfaces.
  *********************************************/
@@ -60,8 +69,6 @@ private extern (Objective-C)
 
 // Types
 
-private extern (C) ClassObjC objc_lookUpClass(in char* name);
-
 private extern (C) struct objc_class;
 private alias Class = objc_class*;
 private extern (C) struct objc_object {
@@ -89,12 +96,97 @@ private extern (C) struct SCDynamicStoreContext;
 private extern (C) struct __CFDictionary;
 private alias CFDictionaryRef = __CFDictionary*;
 
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesHTTPProxy;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesHTTPSProxy;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesFTPProxy;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesSOCKSProxy;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesHTTPPort;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesHTTPSPort;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesFTPPort;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesSOCKSPort;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesHTTPEnable;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesHTTPSEnable;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesFTPEnable;
+private extern (C) extern __gshared immutable CFStringRef kSCPropNetProxiesSOCKSEnable;
+
+// Extensions to help use some of the Objective C types.
+
+private string toString(const CFStringRef cfString) {
+
+	auto cString = CFStringGetCStringPtr(cfString, kCFStringEncodingUTF8);
+
+	if (cString == null) {
+
+		return "";
+
+	} else {
+
+		return cString.fromStringz.idup;
+
+	}
+
+}
+
+struct ProxyDictionaryKeys {
+
+	string proxy;
+	string port;
+	string enable;
+}
+
+ProxyDictionaryKeys getKeys(ProxyType proxyType) {
+
+	ProxyDictionaryKeys result;
+
+	switch(proxyType) {
+
+		case ProxyType.http:
+			result = ProxyDictionaryKeys(
+				kSCPropNetProxiesHTTPProxy.toString,
+				kSCPropNetProxiesHTTPPort.toString,
+				kSCPropNetProxiesHTTPEnable.toString);
+			break;
+
+		case ProxyType.https:
+			result = ProxyDictionaryKeys(
+				kSCPropNetProxiesHTTPSProxy.toString,
+				kSCPropNetProxiesHTTPSPort.toString,
+				kSCPropNetProxiesHTTPSEnable.toString);
+			break;
+
+		case ProxyType.ftp:
+			result = ProxyDictionaryKeys(
+				kSCPropNetProxiesFTPProxy.toString,
+				kSCPropNetProxiesFTPPort.toString,
+				kSCPropNetProxiesFTPEnable.toString);
+			break;
+
+		case ProxyType.socks:
+			result = ProxyDictionaryKeys(
+				kSCPropNetProxiesSOCKSProxy.toString,
+				kSCPropNetProxiesSOCKSPort.toString,
+				kSCPropNetProxiesSOCKSEnable.toString);
+			break;
+
+		default:
+			assert(0);
+
+	}
+
+	return result;
+
+}
+
 // Functions
+
+private extern (C) ClassObjC objc_lookUpClass(in char* name);
 
 private extern (C) CFStringRef CFStringCreateWithCString(
 	CFAllocatorRef alloc,
 	immutable(char) *cStr,
 	CFStringEncoding encoding);
+
+private extern (C) char* CFStringGetCStringPtr(const CFStringRef theString, CFStringEncoding encoding);
 
 private extern (C) SCDynamicStoreRef SCDynamicStoreCreate(
 	CFAllocatorRef allocator,
