@@ -7,6 +7,7 @@ import ProxyGetter.ProxyGetter;
 // TODO:
 //   (1) Use Cocoa's enums to get the proxy settings:
 //       https://developer.apple.com/reference/systemconfiguration/1517088-scdynamicstorecopyproxies
+//
 
 void main(string[] args)
 {
